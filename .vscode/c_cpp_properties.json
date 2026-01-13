@@ -1,0 +1,30 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/bck/bck_ws/install/slam_toolbox/include/**",
+        "/home/bck/ros2_ws/install/robot_utils/include/**",
+        "/home/bck/ros2_ws/install/robot_lidar_autodock/include/**",
+        "/home/bck/ros2_ws/install/robot_msgs/include/**",
+        "/home/bck/ros2_ws/install/robot_ignition_plugins/include/**",
+        "/home/bck/ros2_ws/install/realsense_gazebo_plugin/include/**",
+        "/home/bck/ros2_ws/install/obstacle_detector/include/**",
+        "/opt/ros/humble/include/**",
+        "/home/bck/bck_ws/src/bck_bringup/include/**",
+        "/home/bck/bck_ws/src/bck_description/include/**",
+        "/home/bck/bck_ws/src/slam_toolbox/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

@@ -1,0 +1,26 @@
+# Make Easy Loop Closures (MELC) Parameters
+# Copyright (c) 2026 BCK - MIT License
+
+melc:
+  ros__parameters:
+
+    # Minimum travel distance before recording path point (meters)
+    minimum_travel_distance: 0.5
+
+    # Loop search maximum distance - target radius (meters)
+    loop_search_max_distance: 3.0
+
+    # Loop search space dimension (meters)
+    loop_search_dimension: 8.0
+
+    # Minimum chain size for loop matching
+    loop_chain_size: 10
+
+    # Minimum edge increase to confirm loop closure
+    min_edge_increase: 3
+
+    # Minimum pose age for loop closure target (older poses preferred)
+    min_pose_age: 40
+
+    # Use simulation time
+    use_sim_time: true
