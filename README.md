@@ -10,6 +10,31 @@ A ROS2 package that guides users during SLAM mapping to achieve optimal loop clo
 
 MELC monitors your robot's path during SLAM mapping. When you've traveled far enough without closing a loop, it shows a **red target area** indicating where you should return to create a loop closure.
 
+## Step-by-step: How MELC Guides Loop Closures
+
+### 1) Red target appears (loop suggestion)
+When the robot travels long enough without a loop closure, MELC selects the best historical area (based on age / distance / density scoring) and shows a red target zone.
+Goal: go back into this zone to trigger a loop closure.
+
+<img width="2497" height="745" alt="Screenshot from 2026-01-14 09-19-30" src="https://github.com/user-attachments/assets/4ebab325-bc4f-44c9-9b6b-ba4b08b46d1e" />
+
+### 2) Entering the red zone (attempting loop closure)
+As soon as the robot enters the red target radius, MELC switches to “target reached” mode and starts actively watching the SLAM graph for new constraints.
+
+<img width="2470" height="746" alt="Screenshot from 2026-01-14 09-20-56" src="https://github.com/user-attachments/assets/b0b25aa9-0df2-40ea-866f-d6f532c21dc3" />
+
+### 3) Edge increase detected (loop closure confirmed)
+If SLAM Toolbox adds enough new edges (configurable via min_edge_increase), MELC confirms that the loop closure is happening.
+At this stage, the target becomes yellow, indicating “stay here / keep scanning” while edges are being added.
+
+<img width="2470" height="746" alt="Screenshot from 2026-01-14 09-21-07" src="https://github.com/user-attachments/assets/1315af29-b801-4158-be4d-c1f52c8e726d" />
+
+### 4) Back to the Wild
+Once the loop closure is confirmed and MELC determines that sufficient constraints have been added, the yellow target disappears and the robot is released back into free exploration.
+MELC resets the distance counter and continues monitoring the trajectory, waiting for the next loop closure opportunity.
+
+<img width="2470" height="746" alt="Screenshot from 2026-01-14 09-21-11" src="https://github.com/user-attachments/assets/34f39c3e-c21c-49c1-974c-90a7c84cd402" />
+
 ### Algorithm
 
 1. **Path Tracking**: Records robot position in map frame using TF
