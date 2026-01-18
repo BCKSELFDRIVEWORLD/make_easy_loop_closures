@@ -8,12 +8,12 @@ A ROS2 package that guides users during SLAM mapping to achieve optimal loop clo
 
 ## How It Works
 
-MELC monitors your robot's path during SLAM mapping. When you've traveled far enough without closing a loop, it shows a **red target area** indicating where you should return to create a loop closure.
+MELC monitors the SLAM Toolbox pose graph during mapping. When enough nodes are added without closing a loop, it shows a **red target area** indicating where you should return to create a loop closure.
 
 ## Step-by-step: How MELC Guides Loop Closures
 
 ### 1) Red target appears (loop suggestion)
-When the robot travels long enough without a loop closure, MELC selects the best historical area (based on age / distance / density scoring) and shows a red target zone.
+When enough nodes are added to the SLAM graph without a loop closure, MELC selects the best target area (based on distance / density / distribution / feature scoring) and shows a red target zone.
 Goal: go back into this zone to trigger a loop closure.
 
 <img width="2497" height="745" alt="Screenshot from 2026-01-14 09-19-30" src="https://github.com/user-attachments/assets/4ebab325-bc4f-44c9-9b6b-ba4b08b46d1e" />
@@ -31,30 +31,31 @@ At this stage, the target becomes yellow, indicating “stay here / keep scannin
 
 ### 4) Back to the Wild
 Once the loop closure is confirmed and MELC determines that sufficient constraints have been added, the yellow target disappears and the robot is released back into free exploration.
-MELC resets the distance counter and continues monitoring the trajectory, waiting for the next loop closure opportunity.
+MELC resets the node counter and continues monitoring the SLAM graph, waiting for the next loop closure opportunity.
 
 <img width="2470" height="746" alt="Screenshot from 2026-01-14 09-21-11" src="https://github.com/user-attachments/assets/34f39c3e-c21c-49c1-974c-90a7c84cd402" />
 
 ### Algorithm
 
-1. **Path Tracking**: Records robot position in map frame using TF
-2. **Distance Monitoring**: Tracks total distance traveled since last loop closure
-3. **Target Selection**: When `loop_closure_distance` is reached, finds the best target from path history
-4. **Loop Detection**: Monitors pose graph edges to confirm loop closure
+1. **SLAM Graph Integration**: Uses SLAM Toolbox's pose graph directly (no separate path tracking)
+2. **Automatic Configuration**: Fetches `loop_search_maximum_distance` from SLAM Toolbox parameters
+3. **K-D Tree Optimization**: O(n log n) spatial queries using scipy's K-D Tree (falls back to brute force if unavailable)
+4. **Edge-Based Validation**: Monitors pose graph edges to confirm loop closure with proximity checks
 
 ### Target Selection Scoring
 
-The red target area is chosen based on three factors:
+The red target area is chosen based on four factors:
 
 ```
-score = age_score * 0.3 + distance_score * 0.3 + density_score * 0.4
+score = distance_score * 0.2 + density_score * 0.3 + distribution_score * 0.2 + feature_score * 0.3
 ```
 
 | Factor | Weight | Description |
 |--------|--------|-------------|
-| **Age Score** | 30% | Older poses preferred (better for loop closure quality) |
-| **Distance Score** | 30% | Closer targets preferred (easier to reach) |
-| **Density Score** | 40% | Areas visited multiple times preferred (more edges) |
+| **Distance** | 20% | Closer targets preferred (easier to reach) |
+| **Density** | 30% | Optimal node count in target area |
+| **Distribution** | 20% | More filled sectors = better (6 sectors, 60° each) |
+| **Feature** | 30% | Edge-rich areas preferred (more constraints) |
 
 ## Parameters
 
@@ -63,37 +64,65 @@ All parameters are configured in `config/params.yaml`:
 ```yaml
 melc:
   ros__parameters:
-    minimum_travel_distance: 0.5    # Path point recording interval (m)
-    loop_search_max_distance: 3.0   # Target radius - red circle size (m)
-    loop_search_dimension: 8.0      # Max search distance for targets (m)
-    loop_chain_size: 10             # Min poses before suggesting loop
-    min_edge_increase: 3            # Edge increase to confirm loop closure
-    min_pose_age: 40                # Skip recent poses as targets
+    slam_toolbox_node: "slam_toolbox"  # SLAM Toolbox node name
+    min_graph_nodes: 20                # Min nodes before searching
+    nodes_between_loops: 50            # Nodes between loop suggestions
+    min_edge_increase: 3               # Edge increase to confirm loop
+    edge_proximity_threshold: 1.5      # Edge proximity check (m)
+    min_area_density: -1               # -1 = auto, positive = manual
+    max_area_density: -1               # -1 = auto, positive = manual
+    density_k_min: 1.0                 # K coefficient for min density
+    density_k_max: 11.0                # K coefficient for max density
+    min_sectors: 4                     # Minimum filled sectors (out of 6)
 ```
 
 ### Parameter Details
 
-| Parameter | Default | Effect on Target Area |
-|-----------|---------|----------------------|
-| `minimum_travel_distance` | 0.5m | Path resolution. Lower = more points, smoother path |
-| `loop_search_max_distance` | 3.0m | **Red circle radius**. Robot must enter this area |
-| `loop_search_dimension` | 8.0m | Max distance to search for loop targets |
-| `loop_chain_size` | 10 | Min path points before loop suggestion. `min_path_points = loop_chain_size * 2` |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `slam_toolbox_node` | `"slam_toolbox"` | SLAM Toolbox node name (fetches `loop_search_maximum_distance` from it) |
+| `min_graph_nodes` | 20 | Minimum graph nodes before searching for loop targets |
+| `nodes_between_loops` | 50 | Number of nodes that must be added between loop suggestions |
 | `min_edge_increase` | 3 | Required new edges to confirm loop closure |
-| `min_pose_age` | 40 | Ignores last N path points. Prevents targeting recent poses |
+| `edge_proximity_threshold` | 1.5m | How close edge endpoints must be to robot/target nodes |
+| `min_area_density` | -1 | Minimum nodes in target area (-1 = auto-calculate) |
+| `max_area_density` | -1 | Maximum nodes in target area (-1 = auto-calculate) |
+| `density_k_min` | 1.0 | K coefficient for auto min density: `k * radius²` |
+| `density_k_max` | 11.0 | K coefficient for auto max density: `k * radius²` |
+| `min_sectors` | 4 | Minimum sectors with nodes (out of 6) for valid target |
 
-### Derived Values
+### Auto-Calculated Density
 
-```python
-loop_closure_distance = loop_search_dimension * 3  # Distance before suggesting loop
-loop_closure_radius = loop_search_max_distance     # Red circle radius
-min_path_points = loop_chain_size * 2              # Min points to start
+When `min_area_density` and `max_area_density` are set to `-1`, density limits are auto-calculated:
+
+```
+min_density = density_k_min * radius²
+max_density = density_k_max * radius²
 ```
 
-**Example with defaults:**
-- Loop suggestion after: `8.0 * 3 = 24m` traveled
-- Red circle radius: `3.0m`
-- Ignores last `40` path points as targets
+**Example with radius=3.0m (from SLAM Toolbox):**
+- `k_min=1.0` → min_density = 1.0 × 9 = 9 nodes
+- `k_max=11.0` → max_density = 11.0 × 9 = 99 nodes
+
+### Sector Distribution Check
+
+Target area is divided into 6 sectors (60° each). Areas at map corners/edges are filtered out:
+
+```
+     Sector 1
+       /\
+      /  \
+Sec 6      Sec 2
+    /  ○  \
+   /      \
+Sec 5      Sec 3
+      \/
+   Sector 4
+```
+
+- `min_sectors: 6` = only accept center areas (strictest)
+- `min_sectors: 4` = accept moderately distributed areas (default)
+- `min_sectors: 3` = accept corner/edge areas (most permissive)
 
 ## Installation
 
@@ -134,13 +163,12 @@ Node(
 ## RViz Setup
 
 Add MarkerArray display:
-- Topic: `/melc/markers`
+- Topic: `/loop_closure_assistant/markers`
 
 ### Visualization
 
 | Color | Meaning |
 |-------|---------|
-| **Green path** | Robot's traveled path |
 | **Red cylinder** | Loop closure target - go here! |
 | **Yellow cylinder** | Target reached, waiting for loop closure |
 
@@ -148,8 +176,8 @@ Add MarkerArray display:
 
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/melc/markers` | `MarkerArray` | Visualization markers |
-| `/melc/status` | `String` | Status text |
+| `/loop_closure_assistant/markers` | `MarkerArray` | Visualization markers |
+| `/loop_closure_assistant/status` | `String` | Status text |
 
 ## Subscribed Topics
 
@@ -163,6 +191,7 @@ Add MarkerArray display:
 - ROS2 Humble
 - SLAM Toolbox
 - TF2
+- `python3-scipy` (optional, for K-D Tree optimization - falls back to brute force if unavailable)
 
 ## License
 
