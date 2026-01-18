@@ -4,23 +4,69 @@
 melc:
   ros__parameters:
 
-    # Minimum travel distance before recording path point (meters)
-    minimum_travel_distance: 0.5
+    # SLAM Toolbox node name (to fetch parameters from)
+    slam_toolbox_node: "slam_toolbox"
 
-    # Loop search maximum distance - target radius (meters)
-    loop_search_max_distance: 3.0
+    # Minimum graph nodes before searching for loop closure target
+    min_graph_nodes: 20
 
-    # Loop search space dimension (meters)
-    loop_search_dimension: 8.0
-
-    # Minimum chain size for loop matching
-    loop_chain_size: 10
+    # Number of nodes between loop closures
+    nodes_between_loops: 50
 
     # Minimum edge increase to confirm loop closure
     min_edge_increase: 3
 
-    # Minimum pose age for loop closure target (older poses preferred)
-    min_pose_age: 40
+    # Edge proximity threshold for loop closure detection (meters)
+    # How close edge endpoints must be to robot/old nodes
+    edge_proximity_threshold: 1.5
+
+    # ============================================================
+    # Target Area Density Configuration
+    # ============================================================
+    #
+    # Option 1: Auto-calculate (recommended)
+    #   Set min_area_density and max_area_density to -1
+    #   Formula: density = k * radius²
+    #   Adjust k values below to tune
+    #
+    # Option 2: Manual override
+    #   Set specific values (positive integers)
+    #   k values will be ignored
+    # ============================================================
+
+    # -1 = auto-calculate, positive = manual override
+    min_area_density: -1
+    max_area_density: -1
+
+    # Density coefficients for auto-calculation
+    # density = k * radius²
+    # Example with radius=3.0m:
+    #   k_min=0.33 → min_density = 0.33 * 9 = 3 nodes
+    #   k_max=22.0 → max_density = 22 * 9 = 198 nodes
+    density_k_min: 1.0
+    density_k_max: 11.0
+
+    # ============================================================
+    # Target Distribution Check (Corner/Edge Filter)
+    # ============================================================
+    # Target area is divided into 6 sectors (60° each)
+    # min_sectors: minimum sectors that must have nodes
+    #
+    #        Sector 1
+    #          /\
+    #         /  \
+    #   Sec 6      Sec 2
+    #       /  ○  \
+    #      /      \
+    #   Sec 5      Sec 3
+    #         \/
+    #      Sector 4
+    #
+    # 6/6 = center of map (ideal)
+    # 4/6 = acceptable
+    # 3/6 = corner/edge (skip============================================================)
+    # 
+    min_sectors: 4
 
     # Use simulation time
     use_sim_time: true
